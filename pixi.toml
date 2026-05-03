@@ -1,0 +1,16 @@
+[workspace]
+authors = ["jiahua <jiahuazh_07@outlook.com>"]
+channels = ["conda-forge"]
+name = "stats-lab"
+platforms = ["osx-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+textgrid = ">=1.5,<2"
+pandas = ">=3.0.2,<4"
+matplotlib = ">=3.10.9,<4"
+
+[pypi-dependencies]
+praat-parselmouth = ">=0.4.7, <0.5"
