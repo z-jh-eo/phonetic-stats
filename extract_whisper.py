@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 import soundfile as sf
 from tqdm import tqdm
-from transformers import Wav2Vec2Model, Wav2Vec2FeatureExtractor
+from transformers import WhisperModel, AutoFeatureExtractor
 
 
 def batch_iter(series: pd.Series, batch_size: int = 8):
@@ -35,7 +35,7 @@ def batch_proc(batch_paths: pd.Series, which_layer: int) -> tuple[list[torch.Ten
     trimmed: list[torch.Tensor] = []
     for i, L in enumerate(frame_lengths):
         L = int(L.item())
-        trimmed.append(out.hidden_states[which_layer][i, :L].cpu())
+        trimmed.append(out.decoder_hidden_states[which_layer][i, :L].cpu())
 
     return trimmed, sample_nbs
 
@@ -64,15 +64,15 @@ if __name__ == "__main__":
     # parser.add_argument("--dtype", "-d", default=torch.float64)
     parser.add_argument("--metadata-path", "-m", default="./metadata.csv")
     #parser.add_argument("--output-path", "-o", type=str, required=True)
-    parser.add_argument("--model-name", type=str, default="facebook/wav2vec2-large-xlsr-53")
+    parser.add_argument("--model-name", type=str, default="openai/whisper-medium")
     parser.add_argument("--which-layer", "-l", type=int, default=12)
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print(f"Loading model {args.model_name}...")
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(args.model_name)
-    model = Wav2Vec2Model.from_pretrained(args.model_name)
+    feature_extractor = AutoFeatureExtractor.from_pretrained(args.model_name)
+    model = WhisperModel.from_pretrained(args.model_name)
     model.eval()
     model.to(device)
 
