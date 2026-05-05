@@ -6,6 +6,11 @@ from tqdm import tqdm
 from transformers import WhisperModel, AutoFeatureExtractor
 
 
+# Whisper's CNN encoder always outputs exactly 1500 frames for a 30-s window
+WHISPER_N_ENCODER_FRAMES = 1500
+WHISPER_SECONDS          = 30.0   # the fixed window the encoder sees
+
+
 def batch_iter(series: pd.Series, batch_size: int = 8):
     for i in range(0, len(series), batch_size):
         yield series.iloc[i:i+batch_size]
@@ -21,21 +26,30 @@ def batch_proc(batch_paths: pd.Series, which_layer: int) -> tuple[list[torch.Ten
         sample_nbs.append(len(wav))
         audio_list.append(wav)
 
-    inputs = feature_extractor(audio_list, sampling_rate=16_000,
-                       return_tensors="pt", padding=True)
+    inputs = feature_extractor(
+        audio_list,
+        sampling_rate=16_000,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True
+    )
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
     with torch.no_grad():
-        out = model(**inputs, output_hidden_states=True)
-
-    frame_lengths = model._get_feat_extract_output_lengths(
-        torch.tensor([len(x) for x in audio_list])
-    )
+        out = model(
+            **inputs,
+            decoder_input_ids=torch.zeros(
+                len(audio_list), 1, dtype=torch.long, device=device
+            ),
+            output_hidden_states=True
+        )
 
     trimmed: list[torch.Tensor] = []
-    for i, L in enumerate(frame_lengths):
-        L = int(L.item())
-        trimmed.append(out.decoder_hidden_states[which_layer][i, :L].cpu())
+    for i, n_samp in enumerate(sample_nbs):
+        actual_duration = min(n_samp / 16_000, WHISPER_SECONDS)
+        valide_frames = int(actual_duration / WHISPER_SECONDS * WHISPER_N_ENCODER_FRAMES)
+        valide_frames = max(valide_frames, 1)
+        trimmed.append(out.decoder_hidden_states[which_layer][i, :valide_frames].cpu())
 
     return trimmed, sample_nbs
 
@@ -47,9 +61,12 @@ def word_to_frames(start_s: float, end_s: float, n_samples: int, sr: int = 16_00
 
     duration_s = n_samples / sr
 
-    start_f = int(start_s * n_frames / duration_s)
-    end_f = max(start_f + 1, int(end_s * n_frames / duration_s))
-    end_f = min(end_f, n_frames)
+    duration_s = min(duration_s, WHISPER_SECONDS)
+
+    frames_per_sec = WHISPER_N_ENCODER_FRAMES / WHISPER_SECONDS
+    start_f = int(start_s * frames_per_sec)
+    end_f = max(start_f + 1, int(end_s * frames_per_sec))
+    end_f = min(end_f, int(duration_s * frames_per_sec))
     return start_f, end_f
 
 
