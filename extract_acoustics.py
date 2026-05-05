@@ -1,3 +1,4 @@
+import argparse
 import math
 import parselmouth
 import pandas as pd
@@ -140,48 +141,72 @@ def extract_signal_features(
         }
     return res
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--measure-point", "-m", type=str, default="0.5")
+    args = parser.parse_args()
 
-df = pd.read_csv("./metadata.csv").fillna("")
 
-features = []
-missing_repo = []
-for _, row in df.iterrows():
-    phone = row["phoneme"]
-    wav = row["wav_path"]
-    on = row["onset"]
-    off = row["offset"]
-    gender = row["Gender"]
-    if phone == "":
-        features.append(float("nan"))
-    else:
-        res = extract_signal_features(phone, wav, on, off, gender)
-        if res["ok"]:
-            features.append(res["feats"])
-            if res["is_voiced"] and res["feats"][1] == float("nan"):
+    df = pd.read_csv("./metadata.csv").fillna("")
+
+    features = []
+    f1 = []
+    f2 = []
+    missing_repo = []
+    for _, row in df.iterrows():
+        phone = row["phoneme"]
+        wav = row["wav_path"]
+        on = row["onset"]
+        off = row["offset"]
+        gender = row["Gender"]
+        if phone == "":
+            features.append(float("nan"))
+        else:
+            res = extract_signal_features(phone, wav, on, off, gender)
+            if res["ok"]:
+                features.append(res["feats"])
+                
+                if args.measure_point == "0.5":
+                    f1.append(res["feats"][2])
+                    f2.append(res["feats"][3])
+                elif args.measure_point == "0.25":
+                    f1.append(res["feats"][6] if res["feats"][6] != float("nan") 
+                                else res["feats"][2])
+                    f2.append(res["feats"][7] if res["feats"][7] != float("nan") 
+                                else res["feats"][3])
+                elif args.measure_point == "0.75":
+                    f1.append(res["feats"][10] if res["feats"][10] != float("nan") 
+                                else res["feats"][2])
+                    f2.append(res["feats"][11] if res["feats"][11] != float("nan") 
+                                else res["feats"][3])
+                if res["is_voiced"] and res["feats"][1] == float("nan"):
+                    missing_repo.append({
+                        "wav": wav,
+                        "phoneme": phone,
+                        "error": "Voiced phoneme but f0 is NaN"
+                    })
+            else:
+                #print(f"Error processing {wav} ({phone}): {res["err"]}")
+                features.append(float("nan"))
                 missing_repo.append({
                     "wav": wav,
                     "phoneme": phone,
-                    "error": "Voiced phoneme but f0 is NaN"
+                    "error": res["err"]
                 })
-        else:
-            #print(f"Error processing {wav} ({phone}): {res["err"]}")
-            features.append(float("nan"))
-            missing_repo.append({
-                "wav": wav,
-                "phoneme": phone,
-                "error": res["err"]
-            })
-df["signal_rep"] = features
-df.to_csv("./features_acoustic.csv", index=False)
+    df["signal_rep"] = features
+    df["F1"] = f1
+    df["F2"] = f2
 
-err = pd.DataFrame(missing_repo)
-err.to_csv("./missing.csv", index=False)
+    df.to_csv("./features_acoustic.csv", index=False)
 
-full_count = df.groupby("phoneme")["signal_rep"].size().rename("total")
-missing_ct = df[df["signal_rep"].isna()].groupby("phoneme").size().rename("missing")
-ct = pd.merge(full_count, missing_ct, left_index=True, right_index=True, how="left")
-ct["missing_pct"] = (ct["missing"] / ct["total"] * 100).round(1)
+    err = pd.DataFrame(missing_repo)
+    err.to_csv("./missing.csv", index=False)
 
-ct.to_csv("./missing_summary.csv")
+    full_count = df.groupby("phoneme")["signal_rep"].size().rename("total")
+    missing_ct = df[df["signal_rep"].isna()].groupby("phoneme").size().rename("missing")
+    ct = pd.merge(full_count, missing_ct, left_index=True, right_index=True, how="left")
+    ct["missing_pct"] = (ct["missing"] / ct["total"] * 100).round(1)
+
+    ct.to_csv("./missing_summary.csv")
 #print(ct)
 #print(df.head())
