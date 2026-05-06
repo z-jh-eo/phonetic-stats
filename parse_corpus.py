@@ -63,7 +63,8 @@ if __name__ == "__main__":
     corr_df = corr_df[["rep_id", "sent_id"]]
     df = pd.merge(df, corr_df, on="sent_id", how="left")
 
-    df.to_csv("./metadata.csv")
+    os.makedirs("./tables", exist_ok=True)
+    df.to_csv("./tables/metadata.csv", index=False)
 
 
 

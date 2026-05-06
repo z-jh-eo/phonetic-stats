@@ -46,8 +46,8 @@ def decompose_variance(df: pd.DataFrame, phoneme: str) -> dict:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="features_acoustic.csv")
-    parser.add_argument("--output", default="variance_decomposition.csv")
+    parser.add_argument("--input", default="./reps/features_acoustic.csv")
+    parser.add_argument("--output", default="./tables/variance_decomposition.csv")
     args = parser.parse_args()
 
     df = pd.read_csv(args.input)

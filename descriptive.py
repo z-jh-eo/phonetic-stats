@@ -4,8 +4,8 @@ from normalise import is_vowel, lobanov_norm
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=str, default="features_acoustic.csv")
-    parser.add_argument("--output", type=str, default="descriptive_report.csv")
+    parser.add_argument("--input", type=str, default="./reps/features_acoustic.csv")
+    parser.add_argument("--output", type=str, default="./tables/descriptive_report.csv")
     args = parser.parse_args()
 
     df = pd.read_csv(args.input)
@@ -34,6 +34,6 @@ if __name__ == "__main__":
     res_1[("F2_normed", "iqr")] = iqr["F2_normed"]
     res_1 = res_1.sort_index(axis=1)
 
-    res_1.to_csv(args.output)
+    res_1.to_csv(args.output, index=False)
 
-
+    

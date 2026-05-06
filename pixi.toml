@@ -11,6 +11,10 @@ version = "0.1.0"
 textgrid = ">=1.5,<2"
 pandas = ">=3.0.2,<4"
 matplotlib = ">=3.10.9,<4"
+statsmodels = ">=0.14.6,<0.15"
+seaborn = ">=0.13.2,<0.14"
+umap-learn = ">=0.5.12,<0.6"
+scikit-learn = ">=1.8.0,<2"
 
 [pypi-dependencies]
 praat-parselmouth = ">=0.4.7, <0.5"

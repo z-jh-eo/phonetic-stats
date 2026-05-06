@@ -1,5 +1,7 @@
 import argparse
+import os
 import torch
+import numpy as np
 import pandas as pd
 import soundfile as sf
 from tqdm import tqdm
@@ -62,7 +64,7 @@ def mean_pool_word(frame_reps: torch.Tensor, start_s: float,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # parser.add_argument("--dtype", "-d", default=torch.float64)
-    parser.add_argument("--metadata-path", "-m", default="./metadata.csv")
+    parser.add_argument("--metadata-path", "-m", default="./tables/metadata.csv")
     #parser.add_argument("--output-path", "-o", type=str, required=True)
     parser.add_argument("--model-name", type=str, default="facebook/wav2vec2-large-xlsr-53")
     parser.add_argument("--which-layer", "-l", type=int, default=12)
@@ -102,8 +104,10 @@ if __name__ == "__main__":
         rep = mean_pool_word(row.frame_reps, row.onset, row.offset, row.n_samples)
         word_reps.append(rep)
 
-    df_merged.drop(["frame_reps", "n_samples"], axis=1, inplace=True)
+    #df_merged.drop(["frame_reps", "n_samples"], axis=1, inplace=True)
 
-    df_merged.to_csv("metadata_with_reps.csv", index=False)
-    torch.save(torch.stack(word_reps),
-               f"reps_layer{args.which_layer}_{args.model_name.replace('/', '_')}.pt")
+    #df_merged.to_csv("./tables/metadata_with_reps.csv", index=False)
+    word_reps_np = [rep.numpy() for rep in word_reps]
+    os.makedirs("./reps", exist_ok=True)
+    np.savez("./reps/features_xlsr.npz", word_reps=word_reps_np)
+    #torch.save(torch.stack(word_reps),f"reps_layer{args.which_layer}_{args.model_name.replace('/', '_')}.pt")

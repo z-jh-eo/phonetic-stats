@@ -1,5 +1,6 @@
 import argparse
 import math
+import os
 import traceback
 from typing import Dict, Tuple
 
@@ -175,10 +176,10 @@ def _pick_f1_f2(feats: Tuple[float, ...], measure_point: str) -> Tuple[float, fl
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--measure-point", "-m", choices=["0.25", "0.5", "0.75"], default="0.5")
-    parser.add_argument("--input", "-i", default="./metadata.csv")
-    parser.add_argument("--output", "-o", default="./features_acoustic.csv")
-    parser.add_argument("--missing", "-e", default="./missing.csv")
-    parser.add_argument("--missing-summary", "-s", default="./missing_summary.csv")
+    parser.add_argument("--input", "-i", default="./tables/metadata.csv")
+    parser.add_argument("--output", "-o", default="./reps/features_acoustic.csv")
+    parser.add_argument("--missing", "-e", default="./tables/missing.csv")
+    parser.add_argument("--missing-summary", "-s", default="./tables/missing_summary.csv")
     args = parser.parse_args()
 
     df = pd.read_csv(args.input).fillna("")
@@ -263,6 +264,8 @@ if __name__ == "__main__":
     df["F1"] = f1
     df["F2"] = f2
 
+    os.makedirs("./reps", exist_ok=True)
+
     df.to_csv(args.output, index=False)
 
     err = pd.DataFrame(error_log)
@@ -273,4 +276,4 @@ if __name__ == "__main__":
     ct = pd.merge(full_count, missing_ct, left_index=True, right_index=True, how="left")
     ct["missing_pct"] = (ct["missing"] / ct["total"] * 100).round(1)
 
-    ct.to_csv(args.missing_summary)
+    ct.to_csv(args.missing_summary, index=False)
