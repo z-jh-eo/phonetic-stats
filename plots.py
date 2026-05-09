@@ -80,7 +80,7 @@ def plot_boxplot(df, outdir):
 
 def plot_intra_speaker_variability(df, outdir, subset):
     # === Plot 3: Intra-speaker variability (violin + strip) ===
-    subset = [p.strip() for p in args.subset.split(",") if p.strip()]
+    subset = [int(p.strip()) for p in subset.split(",") if p.strip()]
     sub = df[df["rep_id"].isin(subset)]
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -121,7 +121,8 @@ def plot_2d_proj(df, outdir, by, neural_rep):
     )
     ax.set_title(f"2D projection of {neural_rep} representations colored by " + by)
     # fig.tight_layout()
-    fig.savefig(f"{outdir}/2d_proj_{by}_{neural_rep.split('_')[1]}.png", dpi=300)
+    out_suffix = neural_rep.split("/")[-1].replace(".npz", "").replace("features_", "")
+    fig.savefig(f"{outdir}/2d_proj_{by.lower()}_{out_suffix}.png", dpi=300)
 
 
 
@@ -131,7 +132,11 @@ if __name__ == "__main__":
     parser.add_argument("--input-ac", default="./reps/features_acoustic.csv")
     parser.add_argument("--input-nr", default="./tables/metadata.csv")
     parser.add_argument("--outdir", default="./plots")
-    parser.add_argument("--subset", default="1,2,3")
+    parser.add_argument("--subset", default="1,2,3,4,5,6")
+    parser.add_argument("--layer-wh", default=24, type=int)
+    parser.add_argument("--layer-xlsr", default=24, type=int)
+    # parser.add_argument("--model", default="whisper", choices=["whisper", "xlsr"])
+    parser.add_argument("--dimred", default="pca2", choices=["pca2", "umap"])
     args = parser.parse_args()
 
     import os
@@ -152,10 +157,13 @@ if __name__ == "__main__":
     df_nr = pd.read_csv(args.input_nr)
     df_nr["phoneme"] = df_nr["phoneme"].fillna("")
 
-    plot_2d_proj(df_nr, args.outdir, by="phoneme", neural_rep="./reps/features_whisper_pca2.npz")
-    plot_2d_proj(df_nr, args.outdir, by="L1", neural_rep="./reps/features_whisper_pca2.npz")
-    plot_2d_proj(df_nr, args.outdir, by="Gender", neural_rep="./reps/features_whisper_pca2.npz")
+    whisper_rep = f"./reps/features_whisper_layer_{args.layer_wh}_{args.dimred}.npz"
+    xlsr_rep = f"./reps/features_xlsr_layer_{args.layer_xlsr}_{args.dimred}.npz"
+    
+    plot_2d_proj(df_nr, args.outdir, by="phoneme", neural_rep=whisper_rep)
+    plot_2d_proj(df_nr, args.outdir, by="L1", neural_rep=whisper_rep)
+    plot_2d_proj(df_nr, args.outdir, by="Gender", neural_rep=whisper_rep)
 
-    plot_2d_proj(df_nr, args.outdir, by="phoneme", neural_rep="./reps/features_xlsr_pca2.npz")
-    plot_2d_proj(df_nr, args.outdir, by="L1", neural_rep="./reps/features_xlsr_pca2.npz")
-    plot_2d_proj(df_nr, args.outdir, by="Gender", neural_rep="./reps/features_xlsr_pca2.npz")
+    plot_2d_proj(df_nr, args.outdir, by="phoneme", neural_rep=xlsr_rep)
+    plot_2d_proj(df_nr, args.outdir, by="L1", neural_rep=xlsr_rep)
+    plot_2d_proj(df_nr, args.outdir, by="Gender", neural_rep=xlsr_rep)

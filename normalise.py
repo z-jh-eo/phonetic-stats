@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-VOWELS = {"a", "e", "ɛ", "i", "o", "ø", "u", "y"}
+VOWELS = {"a", "ɑ", "e", "ɛ", "i", "ɪ", "o", "ø", "œ", "u", "y"}
 
 def is_vowel(phoneme: str) -> bool:
     return phoneme.lower().strip() in VOWELS
