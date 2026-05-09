@@ -1,0 +1,458 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# dvc.yaml — Russian-French Interference Corpus phonetics pipeline
+#
+# Layer selection: edit whisper_layer and xlsr_layer in params.yaml,
+# then run `dvc repro`. Only stages that depend on the changed layer re-run.
+#
+# Common commands:
+#   dvc repro                   run all outdated stages
+#   dvc repro extract_whisper   run one stage only
+#   dvc status                  show what is outdated
+#   dvc params diff             show what changed since last run
+#   dvc dag                     print dependency graph
+# ─────────────────────────────────────────────────────────────────────────────
+
+stages:
+
+  # ── 1. parse corpus ──────────────────────────────────────────────────────
+  parse_corpus:
+    cmd: python parse_corpus.py
+    deps:
+      - parse_corpus.py
+      - ${data_path}
+      - ${meta_path}
+      - ${corr_path}
+    params:
+      - params.yaml:
+          - data_path
+          - meta_path
+          - corr_path
+    outs:
+      - tables/metadata.csv
+
+  # ── 2. acoustic extraction ────────────────────────────────────────────────
+  extract_acoustics:
+    cmd:
+      python extract_acoustics.py
+        --input tables/metadata.csv
+        --output reps/features_acoustic.csv
+        --missing tables/missing.csv
+        --missing-summary tables/missing_summary.csv
+        --measure-point ${measure_point}
+    deps:
+      - extract_acoustics.py
+      - normalise.py
+      - tables/metadata.csv
+    params:
+      - params.yaml:
+          - measure_point
+          - max_formant_female
+          - max_formant_male
+          - n_formants
+    outs:
+      - reps/features_acoustic.csv
+      - tables/missing.csv
+      - tables/missing_summary.csv
+
+  # ── 3. Whisper neural extraction ─────────────────────────────────────────
+  # To switch layers: change whisper_layer in params.yaml → dvc repro
+  # This stage and everything downstream will be invalidated automatically.
+  extract_whisper:
+    cmd:
+      python extract_whisper.py
+        --metadata-path tables/metadata.csv
+        --model-name ${whisper_model}
+        --which-layer ${whisper_layer}
+      # mv features_whisper.npz reps/features_whisper.npz
+    deps:
+      - extract_whisper.py
+      - tables/metadata.csv
+    params:
+      - params.yaml:
+          - whisper_model
+          - whisper_layer
+    outs:
+      - reps/features_whisper.npz
+
+  # ── 4. XLS-R neural extraction ───────────────────────────────────────────
+  # To switch layers: change xlsr_layer in params.yaml → dvc repro
+  extract_xlsr:
+    cmd:
+      python extract_neural.py
+        --metadata-path tables/metadata.csv
+        --model-name ${xlsr_model}
+        --which-layer ${xlsr_layer}
+      # mv features_xlsr.npz reps/features_xlsr.npz
+    deps:
+      - extract_neural.py
+      - tables/metadata.csv
+    params:
+      - params.yaml:
+          - xlsr_model
+          - xlsr_layer
+    outs:
+      - reps/features_xlsr.npz
+
+  # ── 5a. reduce — dim 2 (visualisation) ──────────────────────────────────
+  reduce_2d:
+    cmd:
+      python reduce_neural.py
+        --whisper reps/features_whisper.npz
+        --xlsr    reps/features_xlsr.npz
+        --method  ${reduce_method}
+        --dim     2
+        --seed    ${reduce_seed}
+    deps:
+      - reduce_neural.py
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml:
+          - reduce_method
+          - reduce_seed
+    outs:
+      - reps/features_whisper_${reduce_method}2.npz
+      - reps/features_xlsr_${reduce_method}2.npz
+
+  # ── 5b. reduce — dim 50 (clustering / LME) ──────────────────────────────
+  reduce_50d:
+    cmd:
+      python reduce_neural.py
+        --whisper reps/features_whisper.npz
+        --xlsr    reps/features_xlsr.npz
+        --method  pca
+        --dim     50
+        --seed    ${reduce_seed}
+    deps:
+      - reduce_neural.py
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml:
+          - reduce_seed
+    outs:
+      - reps/features_whisper_pca50.npz
+      - reps/features_xlsr_pca50.npz
+
+  # ── 6a. descriptive statistics ───────────────────────────────────────────
+  descriptive:
+    cmd:
+      python descriptive.py
+        --input  reps/features_acoustic.csv
+        --output tables/descriptive_report.csv
+    deps:
+      - descriptive.py
+      - normalise.py
+      - reps/features_acoustic.csv
+    outs:
+      - tables/descriptive_report.csv
+
+  variance_decomposition:
+    cmd:
+      python variance_decomposition.py
+        --input  reps/features_acoustic.csv
+        --output tables/variance_decomposition.csv
+    deps:
+      - variance_decomposition.py
+      - normalise.py
+      - reps/features_acoustic.csv
+    outs:
+      - tables/variance_decomposition.csv
+
+  neural_descriptive:
+    cmd:
+      python neural_descriptive.py
+        --metadata tables/metadata.csv
+        --outdir   tables/between_class_ratio.csv
+    deps:
+      - neural_descriptive.py
+      - tables/metadata.csv
+      - reps/features_whisper_${reduce_method}2.npz
+      - reps/features_xlsr_${reduce_method}2.npz
+    params:
+      - params.yaml:
+          - reduce_method
+    outs:
+      - tables/between_class_ratio.csv
+
+  plots:
+    cmd:
+      python plots.py
+        --input-ac reps/features_acoustic.csv
+        --input-nr tables/metadata.csv
+        --outdir   plots
+        --subset   ${plot_subset}
+    deps:
+      - plots.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - tables/metadata.csv
+      - reps/features_whisper_${reduce_method}2.npz
+      - reps/features_xlsr_${reduce_method}2.npz
+    params:
+      - params.yaml:
+          - reduce_method
+          - plot_subset
+
+  rsm_mantel:
+    cmd:
+      python rsm_mantel.py
+        --acoustic reps/features_acoustic.csv
+        --whisper  reps/features_whisper.npz
+        --xlsr     reps/features_xlsr.npz
+        --n-perm   ${n_perm}
+        --output   tables/rsm_mantel.csv
+    deps:
+      - rsm_mantel.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml:
+          - n_perm
+    outs:
+      - tables/rsm_mantel.csv
+
+  # ── 6b. statistical tests ────────────────────────────────────────────────
+  test_acoustic:
+    cmd:
+      python test_acoustic_l1l2.py
+        --input  reps/features_acoustic.csv
+        --output tables/test_acoustic_l1l2.csv
+        --alpha  ${alpha}
+    deps:
+      - test_acoustic_l1l2.py
+      - normalise.py
+      - reps/features_acoustic.csv
+    params:
+      - params.yaml: [alpha]
+    outs:
+      - tables/test_acoustic_l1l2.csv
+
+  test_gender:
+    cmd:
+      python test_gender_residual.py
+        --input  reps/features_acoustic.csv
+        --output tables/test_gender_residual.csv
+        --alpha  ${alpha}
+    deps:
+      - test_gender_residual.py
+      - normalise.py
+      - reps/features_acoustic.csv
+    params:
+      - params.yaml: [alpha]
+    outs:
+      - tables/test_gender_residual.csv
+
+  test_neural:
+    cmd:
+      python test_neural_l1l2.py
+        --metadata tables/metadata.csv
+        --whisper  reps/features_whisper.npz
+        --xlsr     reps/features_xlsr.npz
+        --n-perm   ${n_perm}
+        --alpha    ${alpha}
+        --output   tables/test_neural_l1l2.csv
+    deps:
+      - test_neural_l1l2.py
+      - normalise.py
+      - tables/metadata.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [n_perm, alpha]
+    outs:
+      - tables/test_neural_l1l2.csv
+
+  distance_matrices:
+    cmd:
+      python distance_matrices.py
+        --acoustic     reps/features_acoustic.csv
+        --whisper      reps/features_whisper.npz
+        --xlsr         reps/features_xlsr.npz
+        --n-perm       ${n_perm}
+        --n-boot       ${n_boot}
+        --out-matrices tables/distance_matrices.csv
+        --out-mantel   tables/distance_mantel.csv
+        --out-ci       tables/distance_bootstrap_ci.csv
+    deps:
+      - distance_matrices.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [n_perm, n_boot]
+    outs:
+      - tables/distance_matrices.csv
+      - tables/distance_mantel.csv
+      - tables/distance_bootstrap_ci.csv
+
+  classifier:
+    cmd:
+      python classifier_loso.py
+        --acoustic    reps/features_acoustic.csv
+        --whisper     reps/features_whisper.npz
+        --xlsr        reps/features_xlsr.npz
+        --out-scores  tables/classifier_scores.csv
+        --out-f1      tables/classifier_f1_per_class.csv
+        --out-cm      tables/classifier_confusion_matrices.csv
+        --out-mcnemar tables/classifier_mcnemar.csv
+    deps:
+      - classifier_loso.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    outs:
+      - tables/classifier_scores.csv
+      - tables/classifier_f1_per_class.csv
+      - tables/classifier_confusion_matrices.csv
+      - tables/classifier_mcnemar.csv
+
+  # ── 6c. LME ──────────────────────────────────────────────────────────────
+  lme:
+    cmd:
+      python lme_models.py
+        --acoustic            reps/features_acoustic.csv
+        --whisper             reps/features_whisper.npz
+        --xlsr                reps/features_xlsr.npz
+        --n-pc                ${n_pc_lme}
+        --out-acoustic-models tables/lme_acoustic_models.csv
+        --out-acoustic-lrt    tables/lme_acoustic_lrt.csv
+        --out-neural          tables/lme_neural_models.csv
+    deps:
+      - lme_models.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [n_pc_lme]
+    outs:
+      - tables/lme_acoustic_models.csv
+      - tables/lme_acoustic_lrt.csv
+      - tables/lme_neural_models.csv
+
+  lme_ci:
+    cmd:
+      python lme_ci_forest.py
+        --acoustic    reps/features_acoustic.csv
+        --out-table   tables/lme_ci_acoustic.csv
+        --out-plot-f1 plots/forest_F1.png
+        --out-plot-f2 plots/forest_F2.png
+    deps:
+      - lme_ci_forest.py
+      - normalise.py
+      - reps/features_acoustic.csv
+    outs:
+      - tables/lme_ci_acoustic.csv
+      - plots/forest_F1.png
+      - plots/forest_F2.png
+
+  neural_ci:
+    cmd:
+      python neural_ci_forest.py
+        --metadata  tables/metadata.csv
+        --whisper   reps/features_whisper.npz
+        --xlsr      reps/features_xlsr.npz
+        --n-boot    ${n_boot}
+        --out-table tables/neural_ci_cosine.csv
+        --out-plot  plots/forest_neural_cosine.png
+    deps:
+      - neural_ci_forest.py
+      - normalise.py
+      - tables/metadata.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [n_boot]
+    outs:
+      - tables/neural_ci_cosine.csv
+      - plots/forest_neural_cosine.png
+
+  rope:
+    cmd:
+      python rope_classification.py
+        --acoustic-ci tables/lme_ci_acoustic.csv
+        --neural-ci   tables/neural_ci_cosine.csv
+        --metadata    tables/metadata.csv
+        --whisper     reps/features_whisper.npz
+        --xlsr        reps/features_xlsr.npz
+        --out-table   tables/rope_classification.csv
+        --out-summary tables/rope_summary.csv
+    deps:
+      - rope_classification.py
+      - normalise.py
+      - tables/lme_ci_acoustic.csv
+      - tables/neural_ci_cosine.csv
+      - tables/metadata.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    outs:
+      - tables/rope_classification.csv
+      - tables/rope_summary.csv
+
+  # ── 6d. clustering ───────────────────────────────────────────────────────
+  vowel_clustering:
+    cmd:
+      python vowel_clustering.py
+        --acoustic reps/features_acoustic.csv
+        --whisper  reps/features_whisper.npz
+        --xlsr     reps/features_xlsr.npz
+        --k-values ${k_values_vowel}
+        --outdir   plots
+        --out-ari  tables/vowel_clustering_ari.csv
+        --out-sil  tables/vowel_clustering_silhouette.csv
+    deps:
+      - vowel_clustering.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [k_values_vowel]
+    outs:
+      - tables/vowel_clustering_ari.csv
+      - tables/vowel_clustering_silhouette.csv
+
+  cv_clustering:
+    cmd:
+      python cv_clustering.py
+        --acoustic reps/features_acoustic.csv
+        --whisper  reps/features_whisper.npz
+        --xlsr     reps/features_xlsr.npz
+        --k-values ${k_values_cv}
+        --outdir   plots
+        --out-ari  tables/cv_clustering_ari.csv
+    deps:
+      - cv_clustering.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [k_values_cv]
+    outs:
+      - tables/cv_clustering_ari.csv
+
+  speaker_clustering:
+    cmd:
+      python speaker_clustering.py
+        --acoustic reps/features_acoustic.csv
+        --whisper  reps/features_whisper.npz
+        --xlsr     reps/features_xlsr.npz
+        --k-values ${k_values_speaker}
+        --outdir   plots
+        --out-ari  tables/speaker_clustering_ari.csv
+    deps:
+      - speaker_clustering.py
+      - normalise.py
+      - reps/features_acoustic.csv
+      - reps/features_whisper.npz
+      - reps/features_xlsr.npz
+    params:
+      - params.yaml: [k_values_speaker]
+    outs:
+      - tables/speaker_clustering_ari.csv
