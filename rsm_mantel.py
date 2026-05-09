@@ -56,39 +56,43 @@ def neural_rsm(npz_path: str, valid_idx: np.ndarray) -> np.ndarray:
 
 # ── Mantel test ──────────────────────────────────────────────────────────────
 
+def _pearson(a, b):
+    """Vectorised Pearson r — much faster than scipy.stats.spearmanr."""
+    a = a - a.mean()
+    b = b - b.mean()
+    denom = np.sqrt((a * a).sum() * (b * b).sum())
+    return float((a * b).sum() / denom) if denom > 0 else 0.0
+
+
 def upper_tri(M: np.ndarray) -> np.ndarray:
-    """Return the upper-triangular elements (excluding diagonal) as a 1D array."""
     idx = np.triu_indices(M.shape[0], k=1)
     return M[idx]
 
 
-def mantel_test(S1: np.ndarray, S2: np.ndarray,
-                n_perm: int = 9999,
-                seed: int = 42) -> dict:
-    """
-    Mantel test: Spearman rank correlation between upper triangles of two RSMs.
-    Permutation p-value: rows/cols of S2 are permuted simultaneously.
-    Both matrices must be the same shape.
-    """
-    assert S1.shape == S2.shape, "RSMs must have the same shape"
+def mantel_test(S1, S2, n_perm=9999, seed=42):
+    assert S1.shape == S2.shape
     n = S1.shape[0]
     rng = np.random.default_rng(seed)
 
     v1 = upper_tri(S1)
     v2 = upper_tri(S2)
 
-    r_obs, _ = spearmanr(v1, v2)
+    # rank once — Spearman = Pearson on ranks
+    from scipy.stats import rankdata
+    rv1 = rankdata(v1).astype(np.float64)
+    rv2 = rankdata(v2).astype(np.float64)
 
-    # permutation null
+    r_obs = _pearson(rv1, rv2)
+
     null = np.empty(n_perm)
     for i in range(n_perm):
         perm = rng.permutation(n)
-        S2p = S2[np.ix_(perm, perm)]
-        r_null, _ = spearmanr(v1, upper_tri(S2p))
-        null[i] = r_null
+        S2p  = S2[np.ix_(perm, perm)]
+        rv2p = rankdata(upper_tri(S2p)).astype(np.float64)
+        null[i] = _pearson(rv1, rv2p)
 
-    p_value = ((np.abs(null) >= np.abs(r_obs)).sum() + 1) / (n_perm + 1)
-    return {"r": float(r_obs), "p": float(p_value), "n_perm": n_perm}
+    p = ((np.abs(null) >= np.abs(r_obs)).sum() + 1) / (n_perm + 1)
+    return {"r": float(r_obs), "p": float(p), "n_perm": n_perm}
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -103,6 +107,7 @@ if __name__ == "__main__":
                         help="Full-dim XLS-R reps (not PCA-reduced)")
     parser.add_argument("--n-perm",    type=int, default=9999)
     parser.add_argument("--seed",      type=int, default=42)
+    parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--output",    default="./tables/rsm_mantel.csv")
     args = parser.parse_args()
 
@@ -116,7 +121,9 @@ if __name__ == "__main__":
     # valid_idx are pandas index labels; convert to positional for numpy slicing
     valid_pos = df.index.get_indexer(valid_idx)
 
-    print(f"Acoustic RSM: {S_ac.shape[0]} tokens")
+    n_tokens = S_ac.shape[0]
+
+    print(f"Acoustic RSM: {n_tokens} tokens")
 
     # ── build neural RSMs ────────────────────────────────────────────────────
     # We need to handle the case where neural reps have NaN rows differently:
@@ -142,6 +149,13 @@ if __name__ == "__main__":
     S_ac = S_ac[np.ix_(joint_valid, joint_valid)]
     wh   = wh_all[joint_valid]
     xl   = xl_all[joint_valid]
+
+    if args.max_tokens and n_tokens > args.max_tokens:
+        rng = np.random.default_rng(42)
+        sample = rng.choice(n_tokens, size=args.max_tokens, replace=False)
+        S_ac = S_ac[np.ix_(sample, sample)]
+        wh   = wh[sample]
+        xl   = xl[sample]
 
     S_wh = cosine_rsm(wh)
     S_xl = cosine_rsm(xl)

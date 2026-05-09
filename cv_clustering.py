@@ -69,7 +69,7 @@ CV_CLASS = {ph: ("vowel" if ph in VOWELS else "consonant")
 def ground_truth_labels(phonemes: list, partition: dict) -> np.ndarray:
     cats = sorted(set(partition.values()))
     cat2int = {c: i for i, c in enumerate(cats)}
-    return np.array([cat2int.get(p, -1) for p in phonemes])
+    return np.array([cat2int.get(partition.get(p), -1) for p in phonemes])
 
 
 # ── acoustic feature matrix ───────────────────────────────────────────────────
@@ -175,6 +175,7 @@ def cluster_and_evaluate(D: np.ndarray, phonemes: list,
         for part_name, part_dict in partitions.items():
             gt    = ground_truth_labels(phonemes, part_dict)
             valid = gt >= 0
+
             if valid.sum() < 2:
                 results["ari"][k][part_name] = np.nan
                 continue
@@ -285,6 +286,11 @@ if __name__ == "__main__":
     # keep only target phonemes present in data
     present = set(df["phoneme"].unique())
     phonemes = sorted([p for p in TARGET_PHONEMES if p in present])
+
+    # debug: check partition dict key matching
+    #for p in phonemes:
+        #print(repr(p), "C_vs_V:", p in CV_CLASS, "manner:", p in MANNER)
+
     print(f"Target phonemes present in data: {phonemes}")
     print(f"  Vowels    : {[p for p in phonemes if p in VOWELS]}")
     print(f"  Consonants: {[p for p in phonemes if p in CONSONANTS]}\n")
@@ -381,6 +387,10 @@ if __name__ == "__main__":
         [f"ARI_{p}" for p in partitions]
     ]
     heatmap_df.columns = list(partitions.keys())
+
+    #print(heatmap_df)
+    #print(heatmap_df.dtypes)
+
     plot_ari_heatmap(heatmap_df,
                      outpath=f"{args.outdir}/ari_heatmap_cv.png")
 

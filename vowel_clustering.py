@@ -35,7 +35,8 @@ def ground_truth_labels(phonemes: list, partition: dict) -> np.ndarray:
     """Map phoneme list to integer cluster labels via partition dict."""
     cats = sorted(set(partition.values()))
     cat2int = {c: i for i, c in enumerate(cats)}
-    return np.array([cat2int.get(p, -1) for p in phonemes])
+    return np.array([cat2int.get(partition.get(p), -1) for p in phonemes])
+
 
 
 # ── mean-vector representations per phoneme ───────────────────────────────────

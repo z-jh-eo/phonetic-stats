@@ -185,6 +185,7 @@ stages:
         --input-nr tables/metadata.csv
         --outdir   plots
         --subset   ${plot_subset}
+        --dimred   ${reduce_method}
     deps:
       - plots.py
       - normalise.py
@@ -204,6 +205,7 @@ stages:
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
         --n-perm   ${n_perm}
+        --max-tokens ${max_tokens}
         --output   tables/rsm_mantel.csv
     deps:
       - rsm_mantel.py

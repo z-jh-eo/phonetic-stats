@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import chi2
 from normalise import is_vowel, lobanov_norm
 
+
 def confidence_ellipse(x, y, ax, n_std=2.4477, **kwargs):
     # 95% ellipse -> sqrt(chi2.ppf(0.95, df=2)) ≈ 2.4477
     if len(x) < 3:
@@ -23,8 +24,10 @@ def confidence_ellipse(x, y, ax, n_std=2.4477, **kwargs):
                       angle=theta, **kwargs)
     ax.add_patch(ellipse)
 
+
 def make_group_label(df):
     return df["L1"].astype(str) + "/" + df["Gender"].astype(str)
+
 
 def plot_vowel_chart(df, outdir):
     # === Plot 1: Vowel chart with centroids + 95% ellipses ===
@@ -54,14 +57,13 @@ def plot_vowel_chart(df, outdir):
     fig.savefig(f"{outdir}/vowel_chart.png", dpi=300)
 
 
-
 def plot_boxplot(df, outdir):
     # === Plot 2: Boxplots of F1 / F2 by phoneme, stratified ===
     g1 = sns.catplot(
-    data=df, x="phoneme", y="F1_normed",
-    col="group", kind="box", col_wrap=2,
-    height=4, aspect=1.2)
-    
+        data=df, x="phoneme", y="F1_normed",
+        col="group", kind="box", col_wrap=2,
+        height=4, aspect=1.2)
+
     g1.set_titles("Group: {col_name}")
     g1.set_axis_labels("Phoneme", "F1 (Lobanov)")
     g1.fig.suptitle("F1 by phoneme (group-stratified)", y=1.03)
@@ -101,7 +103,6 @@ def plot_intra_speaker_variability(df, outdir, subset):
     fig.savefig(f"{outdir}/intra_speaker_variability.png", dpi=300)
 
 
-
 def plot_2d_proj(df, outdir, by, neural_rep):
     reps = np.load(neural_rep)["word_reps"]
     reps = np.stack(reps, axis=0) if reps.dtype == object else reps
@@ -125,18 +126,16 @@ def plot_2d_proj(df, outdir, by, neural_rep):
     fig.savefig(f"{outdir}/2d_proj_{by.lower()}_{out_suffix}.png", dpi=300)
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-ac", default="./reps/features_acoustic.csv")
     parser.add_argument("--input-nr", default="./tables/metadata.csv")
     parser.add_argument("--outdir", default="./plots")
     parser.add_argument("--subset", default="1,2,3,4,5,6")
-    parser.add_argument("--layer-wh", default=24, type=int)
-    parser.add_argument("--layer-xlsr", default=24, type=int)
+    # parser.add_argument("--layer-wh", default=24, type=int)
+    # parser.add_argument("--layer-xlsr", default=24, type=int)
     # parser.add_argument("--model", default="whisper", choices=["whisper", "xlsr"])
-    parser.add_argument("--dimred", default="pca2", choices=["pca2", "umap"])
+    parser.add_argument("--dimred", default="pca", choices=["pca", "umap"])
     args = parser.parse_args()
 
     import os
@@ -149,7 +148,6 @@ if __name__ == "__main__":
     df = df[df["phoneme"].apply(is_vowel)]
     df["group"] = make_group_label(df)
 
-
     plot_vowel_chart(df, args.outdir)
     plot_boxplot(df, args.outdir)
     plot_intra_speaker_variability(df, args.outdir, args.subset)
@@ -157,9 +155,9 @@ if __name__ == "__main__":
     df_nr = pd.read_csv(args.input_nr)
     df_nr["phoneme"] = df_nr["phoneme"].fillna("")
 
-    whisper_rep = f"./reps/features_whisper_layer_{args.layer_wh}_{args.dimred}.npz"
-    xlsr_rep = f"./reps/features_xlsr_layer_{args.layer_xlsr}_{args.dimred}.npz"
-    
+    whisper_rep = f"./reps/features_whisper_{args.dimred}2.npz"
+    xlsr_rep = f"./reps/features_xlsr_{args.dimred}2.npz"
+
     plot_2d_proj(df_nr, args.outdir, by="phoneme", neural_rep=whisper_rep)
     plot_2d_proj(df_nr, args.outdir, by="L1", neural_rep=whisper_rep)
     plot_2d_proj(df_nr, args.outdir, by="Gender", neural_rep=whisper_rep)
