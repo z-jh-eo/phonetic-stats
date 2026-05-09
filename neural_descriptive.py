@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
+
 def between_class_ratio(df, x_col="x", y_col="y", label_col="phoneme"):
     # drop empty phoneme rows
     df = df[df[label_col].astype(str).str.len() > 0].copy()
@@ -53,11 +54,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", type=str, default="./tables/metadata.csv")
     parser.add_argument("--outdir", type=str, default="./tables/between_class_ratio.csv")
+    parser.add_argument("--whisper", type=str, required=True)
+    parser.add_argument("--xlsr", type=str, required=True)
     args = parser.parse_args()
 
     reps = {
-        "whisper": "reps/features_whisper_layer_8_pca2.npz",
-        "xlsr": "reps/features_xlsr_layer_12_pca2.npz",
+        "whisper": args.whisper,
+        "xlsr": args.xlsr,
     }
 
     df_meta = pd.read_csv(args.metadata)
@@ -85,6 +88,3 @@ if __name__ == "__main__":
 
     res_df = pd.DataFrame(res)
     res_df.to_csv(args.outdir, index=False)
-
-
-

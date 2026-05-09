@@ -16,7 +16,7 @@ stages:
 
   # ── 1. parse corpus ──────────────────────────────────────────────────────
   parse_corpus:
-    cmd: python parse_corpus.py
+    cmd: pixi run python parse_corpus.py
     deps:
       - parse_corpus.py
       - ${data_path}
@@ -33,7 +33,7 @@ stages:
   # ── 2. acoustic extraction ────────────────────────────────────────────────
   extract_acoustics:
     cmd:
-      python extract_acoustics.py
+      pixi run python extract_acoustics.py
         --input tables/metadata.csv
         --output reps/features_acoustic.csv
         --missing tables/missing.csv
@@ -57,46 +57,47 @@ stages:
   # ── 3. Whisper neural extraction ─────────────────────────────────────────
   # To switch layers: change whisper_layer in params.yaml → dvc repro
   # This stage and everything downstream will be invalidated automatically.
-  extract_whisper:
-    cmd:
-      python extract_whisper.py
-        --metadata-path tables/metadata.csv
-        --model-name ${whisper_model}
-        --which-layer ${whisper_layer}
-      # mv features_whisper.npz reps/features_whisper.npz
-    deps:
-      - extract_whisper.py
-      - tables/metadata.csv
-    params:
-      - params.yaml:
-          - whisper_model
-          - whisper_layer
-    outs:
-      - reps/features_whisper.npz
+  
+#  extract_whisper:
+#    cmd:
+#      python extract_whisper.py
+#        --metadata-path tables/metadata.csv
+#        --model-name ${whisper_model}
+#        --which-layer ${whisper_layer}
+#      # mv features_whisper.npz reps/features_whisper.npz
+#    deps:
+#      - extract_whisper.py
+#      - tables/metadata.csv
+#    params:
+#      - params.yaml:
+#          - whisper_model
+#          - whisper_layer
+#    outs:
+#      - reps/features_whisper.npz
 
   # ── 4. XLS-R neural extraction ───────────────────────────────────────────
   # To switch layers: change xlsr_layer in params.yaml → dvc repro
-  extract_xlsr:
-    cmd:
-      python extract_neural.py
-        --metadata-path tables/metadata.csv
-        --model-name ${xlsr_model}
-        --which-layer ${xlsr_layer}
-      # mv features_xlsr.npz reps/features_xlsr.npz
-    deps:
-      - extract_neural.py
-      - tables/metadata.csv
-    params:
-      - params.yaml:
-          - xlsr_model
-          - xlsr_layer
-    outs:
-      - reps/features_xlsr.npz
+#  extract_xlsr:
+#    cmd:
+#      python extract_neural.py
+#        --metadata-path tables/metadata.csv
+#        --model-name ${xlsr_model}
+#        --which-layer ${xlsr_layer}
+#      # mv features_xlsr.npz reps/features_xlsr.npz
+#    deps:
+#      - extract_neural.py
+#      - tables/metadata.csv
+#    params:
+#      - params.yaml:
+#          - xlsr_model
+#          - xlsr_layer
+#    outs:
+#      - reps/features_xlsr.npz
 
   # ── 5a. reduce — dim 2 (visualisation) ──────────────────────────────────
   reduce_2d:
     cmd:
-      python reduce_neural.py
+      pixi run python reduce_neural.py
         --whisper reps/features_whisper.npz
         --xlsr    reps/features_xlsr.npz
         --method  ${reduce_method}
@@ -117,7 +118,7 @@ stages:
   # ── 5b. reduce — dim 50 (clustering / LME) ──────────────────────────────
   reduce_50d:
     cmd:
-      python reduce_neural.py
+      pixi run python reduce_neural.py
         --whisper reps/features_whisper.npz
         --xlsr    reps/features_xlsr.npz
         --method  pca
@@ -137,7 +138,7 @@ stages:
   # ── 6a. descriptive statistics ───────────────────────────────────────────
   descriptive:
     cmd:
-      python descriptive.py
+      pixi run python descriptive.py
         --input  reps/features_acoustic.csv
         --output tables/descriptive_report.csv
     deps:
@@ -149,7 +150,7 @@ stages:
 
   variance_decomposition:
     cmd:
-      python variance_decomposition.py
+      pixi run python variance_decomposition.py
         --input  reps/features_acoustic.csv
         --output tables/variance_decomposition.csv
     deps:
@@ -161,9 +162,11 @@ stages:
 
   neural_descriptive:
     cmd:
-      python neural_descriptive.py
+      pixi run python neural_descriptive.py
         --metadata tables/metadata.csv
         --outdir   tables/between_class_ratio.csv
+        --whisper  reps/features_whisper_${reduce_method}2.npz
+        --xlsr     reps/features_xlsr_${reduce_method}2.npz
     deps:
       - neural_descriptive.py
       - tables/metadata.csv
@@ -177,7 +180,7 @@ stages:
 
   plots:
     cmd:
-      python plots.py
+      pixi run python plots.py
         --input-ac reps/features_acoustic.csv
         --input-nr tables/metadata.csv
         --outdir   plots
@@ -196,7 +199,7 @@ stages:
 
   rsm_mantel:
     cmd:
-      python rsm_mantel.py
+      pixi run python rsm_mantel.py
         --acoustic reps/features_acoustic.csv
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
@@ -217,7 +220,7 @@ stages:
   # ── 6b. statistical tests ────────────────────────────────────────────────
   test_acoustic:
     cmd:
-      python test_acoustic_l1l2.py
+      pixi run python test_acoustic_l1l2.py
         --input  reps/features_acoustic.csv
         --output tables/test_acoustic_l1l2.csv
         --alpha  ${alpha}
@@ -232,7 +235,7 @@ stages:
 
   test_gender:
     cmd:
-      python test_gender_residual.py
+      pixi run python test_gender_residual.py
         --input  reps/features_acoustic.csv
         --output tables/test_gender_residual.csv
         --alpha  ${alpha}
@@ -247,7 +250,7 @@ stages:
 
   test_neural:
     cmd:
-      python test_neural_l1l2.py
+      pixi run python test_neural_l1l2.py
         --metadata tables/metadata.csv
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
@@ -267,7 +270,7 @@ stages:
 
   distance_matrices:
     cmd:
-      python distance_matrices.py
+      pixi run python distance_matrices.py
         --acoustic     reps/features_acoustic.csv
         --whisper      reps/features_whisper.npz
         --xlsr         reps/features_xlsr.npz
@@ -291,7 +294,7 @@ stages:
 
   classifier:
     cmd:
-      python classifier_loso.py
+      pixi run python classifier_loso.py
         --acoustic    reps/features_acoustic.csv
         --whisper     reps/features_whisper.npz
         --xlsr        reps/features_xlsr.npz
@@ -314,7 +317,7 @@ stages:
   # ── 6c. LME ──────────────────────────────────────────────────────────────
   lme:
     cmd:
-      python lme_models.py
+      pixi run python lme_models.py
         --acoustic            reps/features_acoustic.csv
         --whisper             reps/features_whisper.npz
         --xlsr                reps/features_xlsr.npz
@@ -337,7 +340,7 @@ stages:
 
   lme_ci:
     cmd:
-      python lme_ci_forest.py
+      pixi run python lme_ci_forest.py
         --acoustic    reps/features_acoustic.csv
         --out-table   tables/lme_ci_acoustic.csv
         --out-plot-f1 plots/forest_F1.png
@@ -353,7 +356,7 @@ stages:
 
   neural_ci:
     cmd:
-      python neural_ci_forest.py
+      pixi run python neural_ci_forest.py
         --metadata  tables/metadata.csv
         --whisper   reps/features_whisper.npz
         --xlsr      reps/features_xlsr.npz
@@ -374,7 +377,7 @@ stages:
 
   rope:
     cmd:
-      python rope_classification.py
+      pixi run python rope_classification.py
         --acoustic-ci tables/lme_ci_acoustic.csv
         --neural-ci   tables/neural_ci_cosine.csv
         --metadata    tables/metadata.csv
@@ -397,7 +400,7 @@ stages:
   # ── 6d. clustering ───────────────────────────────────────────────────────
   vowel_clustering:
     cmd:
-      python vowel_clustering.py
+      pixi run python vowel_clustering.py
         --acoustic reps/features_acoustic.csv
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
@@ -419,7 +422,7 @@ stages:
 
   cv_clustering:
     cmd:
-      python cv_clustering.py
+      pixi run python cv_clustering.py
         --acoustic reps/features_acoustic.csv
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
@@ -439,7 +442,7 @@ stages:
 
   speaker_clustering:
     cmd:
-      python speaker_clustering.py
+      pixi run python speaker_clustering.py
         --acoustic reps/features_acoustic.csv
         --whisper  reps/features_whisper.npz
         --xlsr     reps/features_xlsr.npz
