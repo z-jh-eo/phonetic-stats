@@ -58,41 +58,41 @@ stages:
   # To switch layers: change whisper_layer in params.yaml → dvc repro
   # This stage and everything downstream will be invalidated automatically.
   
-#  extract_whisper:
-#    cmd:
-#      python extract_whisper.py
-#        --metadata-path tables/metadata.csv
-#        --model-name ${whisper_model}
-#        --which-layer ${whisper_layer}
-#      # mv features_whisper.npz reps/features_whisper.npz
-#    deps:
-#      - extract_whisper.py
-#      - tables/metadata.csv
-#    params:
-#      - params.yaml:
-#          - whisper_model
-#          - whisper_layer
-#    outs:
-#      - reps/features_whisper.npz
+  extract_whisper:
+    cmd:
+      python extract_whisper.py
+        --metadata-path tables/metadata.csv
+        --model-name ${whisper_model}
+        --which-layer ${whisper_layer}
+      # mv features_whisper.npz reps/features_whisper.npz
+    deps:
+      - extract_whisper.py
+      - tables/metadata.csv
+    params:
+      - params.yaml:
+          - whisper_model
+          - whisper_layer
+    outs:
+      - reps/features_whisper.npz
 
   # ── 4. XLS-R neural extraction ───────────────────────────────────────────
   # To switch layers: change xlsr_layer in params.yaml → dvc repro
-#  extract_xlsr:
-#    cmd:
-#      python extract_neural.py
-#        --metadata-path tables/metadata.csv
-#        --model-name ${xlsr_model}
-#        --which-layer ${xlsr_layer}
-#      # mv features_xlsr.npz reps/features_xlsr.npz
-#    deps:
-#      - extract_neural.py
-#      - tables/metadata.csv
-#    params:
-#      - params.yaml:
-#          - xlsr_model
-#          - xlsr_layer
-#    outs:
-#      - reps/features_xlsr.npz
+  extract_xlsr:
+    cmd:
+      python extract_neural.py
+        --metadata-path tables/metadata.csv
+        --model-name ${xlsr_model}
+        --which-layer ${xlsr_layer}
+      # mv features_xlsr.npz reps/features_xlsr.npz
+    deps:
+      - extract_neural.py
+      - tables/metadata.csv
+    params:
+      - params.yaml:
+          - xlsr_model
+          - xlsr_layer
+    outs:
+      - reps/features_xlsr.npz
 
   # ── 5a. reduce — dim 2 (visualisation) ──────────────────────────────────
   reduce_2d:
