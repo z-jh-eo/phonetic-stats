@@ -278,6 +278,33 @@ if __name__ == "__main__":
     mc_df = mc_df[col_order]
     mc_df.to_csv(args.out_mcnemar, index=False)
 
+    # ── per-group accuracy ────────────────────────────────────────────────────
+    def get_group_labels(df_v):
+        groups = []
+        for spk in df_v["spk"].unique():
+            test_mask = df_v["spk"] == spk
+            groups.extend(df_v.loc[test_mask, "L1"].tolist())
+        return np.array(groups)
+
+    group_labels = get_group_labels(df_v)
+
+    print("\n── Per-group accuracy ───────────────────────────────────────────")
+    group_rows = []
+    for name in representations:
+        yt, yp = predictions[name]
+        gl = group_labels[:len(yt)]
+        for g in sorted(set(gl)):
+            mask = gl == g
+            acc = float((yt[mask] == yp[mask]).mean())
+            f1  = float(f1_score(yt[mask], yp[mask], average="macro", zero_division=0))
+            group_rows.append({"model": name, "group": g,
+                               "accuracy": round(acc, 4), "f1_macro": round(f1, 4),
+                               "n": int(mask.sum())})
+            print(f"  {name} / {g}: acc={acc:.4f}  F1={f1:.4f}  n={mask.sum()}")
+
+    group_df = pd.DataFrame(group_rows)
+    group_df.to_csv("tables/classifier_scores_by_group.csv", index=False)
+
     print(f"\nSaved → {args.out_scores}")
     print(f"Saved → {args.out_f1}")
     print(f"Saved → {args.out_cm}")

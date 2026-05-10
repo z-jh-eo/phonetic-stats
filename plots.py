@@ -31,7 +31,7 @@ def make_group_label(df):
 
 def plot_vowel_chart(df, outdir):
     # === Plot 1: Vowel chart with centroids + 95% ellipses ===
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(15, 10))
     sns.scatterplot(
         data=df,
         x="F2_normed", y="F1_normed",
@@ -53,7 +53,7 @@ def plot_vowel_chart(df, outdir):
     ax.set_xlabel("F2 (Lobanov)")
     ax.set_ylabel("F1 (Lobanov)")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-    fig.tight_layout()
+    # fig.tight_layout()
     fig.savefig(f"{outdir}/vowel_chart.png", dpi=300)
 
 
